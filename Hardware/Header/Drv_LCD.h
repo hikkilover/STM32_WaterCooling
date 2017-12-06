@@ -173,11 +173,13 @@ void LCD_DrawPoint(uint8_t x,uint8_t y);	                                //LCD画
 void LCD_ShowChar(uint8_t x,uint8_t y,uint8_t ch);                        //LCD显示字符
 void LCD_SetStart(uint8_t start_x,uint8_t start_y);                       //设置格式化打印起始坐标
 void LCD_printf(char *fmt, ...);                                          //LCD格式化打印
-void LCD_Draw_Circle(uint16_t x0, uint16_t y0, uint8_t r, uint16_t color);
 
-void SCREEN_frame_draw(uint16_t frame_color);
-void SCREEN_static_character_draw(uint16_t font_color);
+
 void LCD_Full_Circle(uint16_t x0, uint16_t y0, uint16_t color);
-void SCREEN_dynamic_character_reflash(uint16_t font_color);
-void SCREEN_curve_reflash(uint16_t curve_color);
+void SCREEN_frame_draw(void);
+void SCREEN_static_character_draw(void);
+void SCREEN_dynamic_character_reflash(void);
+void SCREEN_curve_reflash(void);
+uint8_t SCREEN_function_list(void);
+
 #endif /* __DRV_LCD_H */

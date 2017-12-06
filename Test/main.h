@@ -20,6 +20,7 @@
 #include "Drv_ADC.h"
 #include "Drv_Key.h"
 #include "Drv_LED.h"
+#include "Drv_Timer.h"
 
 #include "test.h"
 

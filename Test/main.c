@@ -2,7 +2,7 @@
 
 SYSTEM_MONITOR monitor;
 TEMP_QUEUE temp_q;
-
+uint16_t temp = 0;
 //monitorµÄ³õÊ¼»¯
 void MONITOR_Init(void)
 {
@@ -33,7 +33,7 @@ int main(void)
 
 	MONITOR_Init();
 	QUEUE_Init();
-	MAIN_SURFACE_test();
+	UI_test();
 }
 
 

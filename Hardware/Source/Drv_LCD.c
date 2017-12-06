@@ -104,6 +104,11 @@ const uint8_t ascii_8X16[95][16] =
 
 /*全局变量*/
 uint16_t point_color = BLACK;
+const uint16_t frame_color =  0xBDF7;
+const uint16_t static_font_color = 0x2124;
+const uint16_t dynamic_font_color = BLUE;
+const uint16_t switch_valid = 0x350A;
+const uint16_t switch_invalid = 0xE0C3;
 
 /**
 * @brief  LCD写寄存器函数
@@ -477,34 +482,6 @@ void LCD_printf(char *fmt, ...)
 }
 
 
-//边栏绘制
-void SCREEN_frame_draw(uint16_t frame_color)
-{
-	LCD_Clear(WHITE);
-	int h,w=0;
-	//先绘制的是四周的边缘
-	LCD_Window(0,0,SCREEN_WIDTH-1,SCREEN_HEIGHT-1);
-	for(h=0;h<SCREEN_HEIGHT;h++)
-	{
-		for(w=0;w<SCREEN_WIDTH;w++)
-		{
-			if(PIXEL_IN_FRAME(h,w)) LCD_WR_DATA(frame_color);
-			else LCD_WR_DATA(WHITE);
-		}
-	}
-	//再绘制中间的横线
-	LCD_Window(HORIZONTAL_MARGIN,MIDDLE_TOP,SCREEN_WIDTH-HORIZONTAL_MARGIN-1,MIDDLE_BOTTOM-1);
-	for(h=0;h<MIDDLE_MARGIN_HEIGHT;h++)
-	{
-		for(w=0;w<(SCREEN_WIDTH-2*HORIZONTAL_MARGIN);w++)
-		{
-			LCD_WR_DATA(frame_color);
-		}
-	}
-}
-
-
-//绘制一个圆
 void LCD_Full_Circle(uint16_t x0, uint16_t y0, uint16_t color)
 {
 	point_color = color;
@@ -524,10 +501,39 @@ void LCD_Full_Circle(uint16_t x0, uint16_t y0, uint16_t color)
 }
 
 
-void SCREEN_static_character_draw(uint16_t font_color)
+//四周边栏绘制
+void SCREEN_frame_draw(void)
 {
-	point_color=font_color;
-	uint8_t i = 0;
+	LCD_Clear(WHITE);
+	int h,w=0;
+	//先绘制的是四周的边缘
+	LCD_Window(0,0,SCREEN_WIDTH-1,SCREEN_HEIGHT-1);
+	for(h=0;h<SCREEN_HEIGHT;h++)
+	{
+		for(w=0;w<SCREEN_WIDTH;w++)
+		{
+			if(PIXEL_IN_FRAME(h,w)) LCD_WR_DATA(frame_color);
+			else LCD_WR_DATA(WHITE);
+		}
+	}
+}
+
+
+//固定字符显示
+//圆形色块初始化为蓝色
+void SCREEN_static_character_draw(void)
+{
+	point_color = static_font_color;
+	uint8_t i,h,w = 0;
+	//绘制中间的横线
+	LCD_Window(HORIZONTAL_MARGIN,MIDDLE_TOP,SCREEN_WIDTH-HORIZONTAL_MARGIN-1,MIDDLE_BOTTOM-1);
+	for(h=0;h<MIDDLE_MARGIN_HEIGHT;h++)
+	{
+		for(w=0;w<(SCREEN_WIDTH-2*HORIZONTAL_MARGIN);w++)
+		{
+			LCD_WR_DATA(frame_color);
+		}
+	}
 	//上半屏内字符
 	LCD_SetStart(110, VERTICAL_MARGIN);
 	LCD_printf("T Curve");
@@ -553,29 +559,12 @@ void SCREEN_static_character_draw(uint16_t font_color)
 	}
 }
 
-extern SYSTEM_MONITOR monitor;
-void SCREEN_dynamic_character_reflash(uint16_t font_color)
-{
-	point_color=font_color;
-	uint8_t i = 0;
-	LCD_SetStart(TABLE_CHARACTER_LEFT+105,TABLE_CHARACTER_TOP);
-	LCD_printf("%d",monitor.temperature);
-	LCD_SetStart(TABLE_CHARACTER_LEFT+105,TABLE_CHARACTER_TOP+20);
-	LCD_printf("%d",monitor.fanMotorDutyRatio);
-	LCD_SetStart(TABLE_CHARACTER_LEFT+105,TABLE_CHARACTER_TOP+40);
-	LCD_printf("%d",monitor.pumpMotorDutyRatio);
-	//考虑字符本身就占地方，余下的信息还是直接用色块显示
-	for(i = 0; i<CIRCLE_NUMBER; i++)
-	{
-		//绿色 有效
-		if (monitor.state&(0x80>>i)) LCD_Full_Circle(FIRST_CIRCLE_X0+CIRCLE_GAP*i, CIRCLE_Y0, 0x350A);
-		//红色 无效
-		else LCD_Full_Circle(FIRST_CIRCLE_X0+CIRCLE_GAP*i, CIRCLE_Y0, 0xE0C3);
-	}
-}
 
+//温度曲线绘制
+//可以考虑不同的温度用不同的颜色显示 颜色在RED和BLUE之间平滑变化
+//增加一个oldcurve的记录，可以加快曲线刷新的速度
 extern TEMP_QUEUE temp_q;
-void SCREEN_curve_reflash(uint16_t curve_color)
+void SCREEN_curve_reflash(void)
 {
 	uint16_t w = 0;
 	uint16_t index,oldIndex = 0;
@@ -598,9 +587,77 @@ void SCREEN_curve_reflash(uint16_t curve_color)
 		point_color = WHITE;
 		LCD_DrawPoint(CURVE_LEFT + w,CURVE_BOTTOM - temp_q.temp[oldIndex]);
 		//color随温度平滑改变
+		//这里的写法还实现不了
 		point_color = (RED-BLUE)*((float)(temp_q.temp[index]-20)/100)+BLUE;
 		LCD_DrawPoint(CURVE_LEFT + w,CURVE_BOTTOM - temp_q.temp[index]);
-		//ADD
 		w++;
 	}
+}
+
+
+//动态字符刷新 
+//包括开关量的指示色块
+//指示色块的使用方法待定
+extern SYSTEM_MONITOR monitor;
+void SCREEN_dynamic_character_reflash(void)
+{
+	point_color = dynamic_font_color;
+	uint8_t i = 0;
+	LCD_SetStart(TABLE_CHARACTER_LEFT+105,TABLE_CHARACTER_TOP);
+	LCD_printf("%d",monitor.temperature);
+	LCD_SetStart(TABLE_CHARACTER_LEFT+105,TABLE_CHARACTER_TOP+20);
+	LCD_printf("%d",monitor.fanMotorDutyRatio);
+	LCD_SetStart(TABLE_CHARACTER_LEFT+105,TABLE_CHARACTER_TOP+40);
+	LCD_printf("%d",monitor.pumpMotorDutyRatio);
+	//考虑字符本身就占地方，余下的信息还是直接用色块显示
+	for(i = 0; i<CIRCLE_NUMBER; i++)
+	{
+		//绿色 有效
+		if (monitor.state&(0x80>>i)) LCD_Full_Circle(FIRST_CIRCLE_X0+CIRCLE_GAP*i, CIRCLE_Y0,switch_valid);
+		//红色 无效
+		else LCD_Full_Circle(FIRST_CIRCLE_X0+CIRCLE_GAP*i, CIRCLE_Y0,switch_invalid);
+	}
+}
+
+//选单
+uint8_t SCREEN_function_list(void)
+{
+	point_color = static_font_color;
+	uint8_t select = 0;
+	int i, w;
+	uint8_t key = 0;
+	SCREEN_frame_draw();
+	//先绘制固定的分割线
+	for(i = 1; i< 5; i++)
+	{
+		LCD_Window(HORIZONTAL_MARGIN, VERTICAL_MARGIN + 30*i, SCREEN_WIDTH - HORIZONTAL_MARGIN, VERTICAL_MARGIN + 30*i + 2);
+		for(w = 0; w < SCREEN_WIDTH - 2 * HORIZONTAL_MARGIN; w++)
+		{
+			LCD_WR_DATA(frame_color);
+			LCD_WR_DATA(frame_color);
+		}
+	}
+	LCD_SetStart(HORIZONTAL_MARGIN+25, VERTICAL_MARGIN+6);
+	LCD_printf("Parameter Adjust");
+	LCD_SetStart(HORIZONTAL_MARGIN+25, VERTICAL_MARGIN+36);
+	LCD_printf("Introduction");
+	LCD_SetStart(HORIZONTAL_MARGIN+25, VERTICAL_MARGIN+66);
+	LCD_printf("About Us");
+	LCD_SetStart(HORIZONTAL_MARGIN+25, VERTICAL_MARGIN+96);
+	LCD_printf("Return");
+	while(key !=  KEY_CENTER_PRES)
+	{
+		key = KEY_Scan(0);
+		if(key == KEY_UP_PRES)  
+		{
+			if(select == 0) select = 3;
+			else select --;
+		}	
+		if(key == KEY_DOWN_PRES)  	select = (select + 1)%4;
+		for(i = 0; i< 4; i++)
+		{
+			LCD_Full_Circle(HORIZONTAL_MARGIN +12, VERTICAL_MARGIN + 15 + 30*i,(select==i)?switch_valid:WHITE);
+		}
+	}
+	return select;
 }

@@ -37,22 +37,22 @@ void QUEUE_reflash(uint16_t seed)
 //主界面测试
 //包括动态曲线和字符
 //这里的配色方案可以参考
+extern uint16_t temp;
 void MAIN_SURFACE_test(void)
 {
 	uint16_t i =1;
-	uint16_t temp = 0;
 	ADC1_Init();
 	LCD_Init();
 	MONITOR_Test_Init();
 	QUEUE_Test_Init();
-	SCREEN_frame_draw(0xBDF7);
-	SCREEN_static_character_draw(0x2124);
-	SCREEN_dynamic_character_reflash(BLUE);
+	SCREEN_frame_draw();
+	SCREEN_static_character_draw();
 	while(1)
 	{
 		//QUEUE_reflash(i%90);
 		temp = TEMP_get();
-		SCREEN_curve_reflash(GREEN);
+		SCREEN_curve_reflash();
+		SCREEN_dynamic_character_reflash();
 		i++;
 		if(i>=200) i = 1;
 		Delay_Ms(100);
@@ -102,4 +102,73 @@ void KEY_LED_test(void)
 			}
 		key = 0;
 	}
+}
+
+//单独测试选单
+void FUNCTION_LIST_test(void)
+{
+	uint8_t select;
+	LCD_Init();
+	KEY_Init();
+	LED_Init();
+	select = SCREEN_function_list();
+	if(select == 0) LED1(ON);
+	else if(select== 1) LED2(ON);
+	else if(select== 2) LED3(ON);
+	else if(select== 3) LED4(ON);	
+	else
+	{
+		LED1(OFF);
+		LED2(OFF);
+		LED3(OFF);
+		LED4(OFF);
+	}
+}
+
+//中断测试
+extern uint16_t temp;
+void INTERRUPT_test(void)
+{
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2); //设置NVIC中断分组2:2位抢占优先级，2位响应优先级
+	ADC1_Init();
+	LED_Init();
+	TIM3_Int_Init(4999,7199);//10Khz的计数频率，计数到5000为500ms 
+	while(1)
+	{
+		if(temp < 25) LED1(ON);
+		else LED1(OFF);
+		Delay_Ms(200);
+	}
+}
+
+//目前最完整的测试函数
+void UI_test(void)
+{
+	uint16_t i =1;
+	uint8_t select;
+	uint8_t key = 0;
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2); 
+	KEY_Init();
+	LED_Init();
+	ADC1_Init();
+	LCD_Init();
+	TIM3_Int_Init(4999,7199);
+main_screen:
+	SCREEN_frame_draw();
+	SCREEN_static_character_draw();
+	while(1)
+	{
+		SCREEN_curve_reflash();
+		SCREEN_dynamic_character_reflash();
+		key = KEY_Scan(0);
+		if(key)
+		{
+			select = SCREEN_function_list();
+			if(select == 3) goto main_screen;
+		}
+		i++;
+		if(i>=200) i = 1;
+		
+		Delay_Ms(200);
+	}	
 }
