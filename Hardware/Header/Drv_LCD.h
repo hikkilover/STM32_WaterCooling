@@ -180,6 +180,10 @@ void SCREEN_frame_draw(void);
 void SCREEN_static_character_draw(void);
 void SCREEN_dynamic_character_reflash(void);
 void SCREEN_curve_reflash(void);
-uint8_t SCREEN_function_list(void);
+bool SCREEN_function_list(void);
+void SCREEN_progress_bar(uint16_t x0, uint16_t y0, uint8_t precent);
+bool SCREEN_parameter_adjust(void);
+bool SCREEN_about(void);
+bool SCREEN_introduction(void);
 
 #endif /* __DRV_LCD_H */

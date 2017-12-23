@@ -2,7 +2,9 @@
 
 SYSTEM_MONITOR monitor;
 TEMP_QUEUE temp_q;
+PID_CONTROLLER pid_controller;
 uint16_t temp = 0;
+uint8_t focus = 0;
 //monitor的初始化
 void MONITOR_Init(void)
 {
@@ -21,6 +23,16 @@ void QUEUE_Init(void)
 	temp_q.rear = 0;
 }
 
+void CONTROLLER_Init(void)
+{
+	pid_controller.Kp = 10;
+	pid_controller.Kp_strength = 20;
+	pid_controller.Ki = 5;
+	pid_controller.Ki_strength = 10;
+	pid_controller.Kd = 0.1;
+	pid_controller.Kd_strength = 0;
+}
+
 
 int main(void)
 {
@@ -30,9 +42,10 @@ int main(void)
 	//USART1初始化，用作格式化输入输出
 	USART1_Init(115200);
 	printf("\r\n");
-
+	//初始化三个结构体
 	MONITOR_Init();
 	QUEUE_Init();
+	CONTROLLER_Init();
 	UI_test();
 }
 

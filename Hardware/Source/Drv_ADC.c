@@ -45,6 +45,7 @@ void ADC1_Init(void)
 }				  
 //获得ADC值
 //ch:通道值 12
+extern SYSTEM_MONITOR monitor;
 u16 Get_ADC1_CH12(void)   
 {
   	//设置指定ADC的规则组通道，一个序列，采样时间
@@ -53,7 +54,7 @@ u16 Get_ADC1_CH12(void)
 	ADC_SoftwareStartConvCmd(ADC1, ENABLE);		//使能指定的ADC1的软件转换启动功能	
 	 
 	while(!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC ));//等待转换结束
-
+	
 	return ADC_GetConversionValue(ADC1);	//返回最近一次ADC1规则组的转换结果
 }
 
@@ -66,6 +67,8 @@ u16 Get_ADC1_CH12_Average(u8 times)
 		temp_val+=Get_ADC1_CH12();
 		Delay_Ms(5);
 	}
+	//ADC采样过程结束认为ADC在正常工作
+	monitor.state |= 0x80;
 	return temp_val/times;
 } 	 
 

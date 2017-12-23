@@ -449,9 +449,9 @@ void LCD_printf(char *fmt, ...)
 	vsnprintf(buffer,CMD_BUFFER_LEN+1,fmt,arg_ptr);
 	while((i < CMD_BUFFER_LEN) && buffer[i])
 	{
-		if(px > LCD_W-8)
+		if(px > LCD_W-8 - HORIZONTAL_MARGIN)
 		{
-			px = 0;
+			px = 0 + HORIZONTAL_MARGIN + 4;
 			py += 16;
 		}
 		if(py > LCD_H-16)
@@ -462,7 +462,7 @@ void LCD_printf(char *fmt, ...)
 		
 		if(buffer[i] == '\n')
 		{
-			px = 0;
+			px = 0 + HORIZONTAL_MARGIN + 4;
 			py += 16;
 			i++;
 		}
@@ -620,14 +620,15 @@ void SCREEN_dynamic_character_reflash(void)
 }
 
 //选单
-uint8_t SCREEN_function_list(void)
+extern uint8_t focus; 
+
+bool SCREEN_function_list(void)
 {
-	point_color = static_font_color;
-	uint8_t select = 0;
 	int i, w;
+	bool is_return = FALSE;
 	uint8_t key = 0;
 	SCREEN_frame_draw();
-	//先绘制固定的分割线
+	//先绘制固定的分割线与字符串
 	for(i = 1; i< 5; i++)
 	{
 		LCD_Window(HORIZONTAL_MARGIN, VERTICAL_MARGIN + 30*i, SCREEN_WIDTH - HORIZONTAL_MARGIN, VERTICAL_MARGIN + 30*i + 2);
@@ -642,22 +643,207 @@ uint8_t SCREEN_function_list(void)
 	LCD_SetStart(HORIZONTAL_MARGIN+25, VERTICAL_MARGIN+36);
 	LCD_printf("Introduction");
 	LCD_SetStart(HORIZONTAL_MARGIN+25, VERTICAL_MARGIN+66);
-	LCD_printf("About Us");
+	LCD_printf("About_Us");
 	LCD_SetStart(HORIZONTAL_MARGIN+25, VERTICAL_MARGIN+96);
 	LCD_printf("Return");
-	while(key !=  KEY_CENTER_PRES)
+	//按键选择
+	while(1)
 	{
 		key = KEY_Scan(0);
 		if(key == KEY_UP_PRES)  
 		{
-			if(select == 0) select = 3;
-			else select --;
+			if(focus == 0) focus = 3;
+			else focus --;
 		}	
-		if(key == KEY_DOWN_PRES)  	select = (select + 1)%4;
+		else if(key == KEY_DOWN_PRES)  	focus = (focus + 1)%4;
+		else	if(key == KEY_CENTER_PRES) 
+		{
+			is_return = TRUE;
+			break;
+		}
+		else {}
 		for(i = 0; i< 4; i++)
 		{
-			LCD_Full_Circle(HORIZONTAL_MARGIN +12, VERTICAL_MARGIN + 15 + 30*i,(select==i)?switch_valid:WHITE);
+			LCD_Full_Circle(HORIZONTAL_MARGIN +12, VERTICAL_MARGIN + 15 + 30*i,(focus==i)?switch_valid:WHITE);
+		}
+
+	}
+	return is_return;
+}
+
+void SCREEN_progress_bar(uint16_t x0, uint16_t y0, uint8_t precent)
+{
+	int h,w = 0;
+	//每一行两侧的白色宽度
+	uint8_t white_gap= 0;
+	if(precent > 100) precent =100; 
+	LCD_Window(x0, y0, x0+99, y0+18);
+	for(h = 0; h < 19; h ++)
+	{
+		white_gap = (19 - circle_r9[h])/2;
+		for(w = 0; w < 100; w++)
+		{
+			if(w < white_gap || (99-w) < white_gap) LCD_WR_DATA(WHITE);
+			else if (w < precent) LCD_WR_DATA(GREEN);
+			else LCD_WR_DATA(RED);
 		}
 	}
-	return select;
+}
+
+extern PID_CONTROLLER pid_controller;
+extern uint8_t focus;
+
+#define STRENGTH_UP(x,x_strength) if(pid_controller.x_strength < 95){pid_controller.x_strength +=5;} \
+																	else {pid_controller.x_strength=100;} \
+																	SCREEN_progress_bar(30, 60+50*focus, pid_controller.x_strength);\
+																	LCD_SetStart(HORIZONTAL_MARGIN+49, VERTICAL_MARGIN+36+50*focus); \
+																	LCD_printf("%.2f",pid_controller.x*(int)pid_controller.x_strength/100)
+
+#define STRENGTH_DOWN(x,x_strength)	if(pid_controller.x_strength>4) {pid_controller.x_strength -=5;}\
+																		else {pid_controller.x_strength =0;}\
+																		SCREEN_progress_bar(30, 60+50*focus, pid_controller.x_strength);\
+																		LCD_SetStart(HORIZONTAL_MARGIN+49, VERTICAL_MARGIN+36+50*focus); \
+																		LCD_printf("%.2f",pid_controller.x*(int)pid_controller.x_strength/100)
+//参数作用调整页
+bool SCREEN_parameter_adjust(void)
+{
+	int i,w;
+	uint8_t key = 0;
+	if(focus>3) focus = 3;
+	//绘制固定部分
+	SCREEN_frame_draw();
+	//先绘制固定的分割线与字符串
+	for(i = 0; i< 4; i++)
+	{
+		LCD_Window(HORIZONTAL_MARGIN, VERTICAL_MARGIN +30 + 50*i, SCREEN_WIDTH - HORIZONTAL_MARGIN, VERTICAL_MARGIN + 32 + 50*i);
+		for(w = 0; w < SCREEN_WIDTH - 2 * HORIZONTAL_MARGIN; w++)
+		{
+			LCD_WR_DATA(frame_color);
+			LCD_WR_DATA(frame_color);
+		}
+	}
+	point_color = static_font_color;
+	LCD_SetStart(HORIZONTAL_MARGIN+20, VERTICAL_MARGIN+6);
+	LCD_printf("Parameter Adjust");
+	
+	LCD_SetStart(HORIZONTAL_MARGIN+25, VERTICAL_MARGIN+36);
+	LCD_printf("Kp:%.2f",pid_controller.Kp*(int)pid_controller.Kp_strength/100);
+	SCREEN_progress_bar(30, 60, pid_controller.Kp_strength);
+	
+	LCD_SetStart(HORIZONTAL_MARGIN+25, VERTICAL_MARGIN+86);
+	LCD_printf("Ki:%.2f",pid_controller.Ki*(int)pid_controller.Ki_strength/100);
+	SCREEN_progress_bar(30, 110, pid_controller.Ki_strength);
+	
+	LCD_SetStart(HORIZONTAL_MARGIN+25, VERTICAL_MARGIN+136);
+	LCD_printf("Kd:%.2f",pid_controller.Kd*(int)pid_controller.Kd_strength/100);
+	SCREEN_progress_bar(30, 160, pid_controller.Kd_strength);
+	
+	LCD_SetStart(HORIZONTAL_MARGIN+100, VERTICAL_MARGIN+186);
+	LCD_printf("Return");
+	while(1)
+	{
+		key = KEY_Scan(0);
+		switch (key) {
+			case KEY_UP_PRES : (focus == 0)?focus = 3:focus --; break;
+			case KEY_DOWN_PRES : focus = (focus + 1)%4; break;
+			case KEY_LEFT_PRES:
+			{
+				point_color = dynamic_font_color;
+				if(focus>3) break;
+				if(focus == 0) 	{STRENGTH_DOWN(Kp,Kp_strength);}
+				else if(focus == 1) 	{STRENGTH_DOWN(Ki,Ki_strength);}
+				else if(focus == 2) 	{STRENGTH_DOWN(Kd,Kd_strength);}
+				break;
+			}
+			case KEY_RIGHT_PRES:
+			{
+				point_color = dynamic_font_color;
+				if(focus>3) break;
+				if(focus == 0) 	{STRENGTH_UP(Kp,Kp_strength);}
+				else if(focus == 1) 	{STRENGTH_UP(Ki,Ki_strength);}
+				else if(focus == 2) 	{STRENGTH_UP(Kd,Kd_strength);}
+				break;
+			}
+			case KEY_CENTER_PRES :  
+			{
+				if(focus==3) return TRUE;
+				else break;
+			}
+		}
+		for(i = 0; i< 4; i++) LCD_Full_Circle(HORIZONTAL_MARGIN +12 + 70 *(i==3), VERTICAL_MARGIN + 45 + 50*i,(focus==i)?switch_valid:WHITE);
+	}
+}
+
+
+bool SCREEN_about(void)
+{
+	uint8_t key;
+	//绘制边框
+	SCREEN_frame_draw();
+	point_color = static_font_color;
+	LCD_SetStart(HORIZONTAL_MARGIN+50, VERTICAL_MARGIN+6);
+	LCD_printf("About Us");
+	LCD_SetStart(HORIZONTAL_MARGIN+20, VERTICAL_MARGIN+26);
+	LCD_printf("By:");
+	point_color = BLUE;
+	LCD_SetStart(HORIZONTAL_MARGIN+10, VERTICAL_MARGIN+50);
+	LCD_printf("Li Ruobai  Han Xuan");
+	LCD_SetStart(HORIZONTAL_MARGIN+10, VERTICAL_MARGIN+70);
+	LCD_printf("Ma Mingke  Wang Wei");
+	point_color = static_font_color;
+	LCD_SetStart(HORIZONTAL_MARGIN+20, VERTICAL_MARGIN+105);
+	LCD_printf("GitHab URL:");
+	point_color = BLUE;
+	LCD_SetStart(HORIZONTAL_MARGIN+20, VERTICAL_MARGIN+125);
+	LCD_printf("https://github.com/hikkilover/STM32_WaterCooling");	
+	point_color = 0x350A;
+	LCD_SetStart(HORIZONTAL_MARGIN+50, VERTICAL_MARGIN+190);
+	LCD_printf("KeyCenter:BACK");	
+	while(1)
+	{
+		key = KEY_Scan(0);
+		if(key == KEY_CENTER_PRES) return TRUE;
+	}
+}
+
+bool SCREEN_introduction(void)
+{
+	uint8_t key;
+	uint8_t page = 0;
+	//绘制边框
+reflash:
+	LCD_Clear(WHITE);
+	SCREEN_frame_draw();
+	point_color = static_font_color;
+	LCD_SetStart(HORIZONTAL_MARGIN+40, VERTICAL_MARGIN+6);
+	LCD_printf("Introduction");
+	if(page == 0)
+	{
+		LCD_SetStart(HORIZONTAL_MARGIN+28, VERTICAL_MARGIN+30);
+		LCD_printf("This is a human machine interface fora miniature water-cooling system,which used PTC heating film as heat source.");
+		LCD_SetStart(HORIZONTAL_MARGIN+28, VERTICAL_MARGIN+130);
+		LCD_printf("With the help of LM35,users are able to collect the temp-");
+		point_color = 0x350A;
+		LCD_SetStart(HORIZONTAL_MARGIN+30, VERTICAL_MARGIN+190);
+		LCD_printf("KeyDown:Next Page");
+	}
+	if(page == 1)
+	{
+		LCD_SetStart(HORIZONTAL_MARGIN+4, VERTICAL_MARGIN+30);
+		LCD_printf("erature data and therefore control the temperature of the heat source through PID controller.");
+		LCD_SetStart(HORIZONTAL_MARGIN+28, VERTICAL_MARGIN+110);
+		LCD_printf("The cooling process is executed by water pump and electrical fan.");
+		point_color = 0x350A;
+		LCD_SetStart(HORIZONTAL_MARGIN+50, VERTICAL_MARGIN+190);
+		LCD_printf("KeyCenter:BACK");
+	}
+	while(1)
+	{
+		key = KEY_Scan(0);
+		switch(key){
+			case KEY_UP_PRES : (page == 0)?page = 0:page--; goto reflash;
+			case KEY_DOWN_PRES : (page == 1)?page = 1:page++; goto reflash;
+			case KEY_CENTER_PRES : return TRUE;
+		}
+	}
 }

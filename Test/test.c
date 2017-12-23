@@ -1,5 +1,6 @@
 #include "test.h"
-
+#define offsetof(TYPE, MEMBER) ((int) &((TYPE *)0)->MEMBER)
+	
 extern SYSTEM_MONITOR monitor;
 void MONITOR_Test_Init(void)
 {
@@ -105,17 +106,18 @@ void KEY_LED_test(void)
 }
 
 //单独测试选单
+extern uint8_t focus;
 void FUNCTION_LIST_test(void)
 {
-	uint8_t select;
+	bool is_return;
 	LCD_Init();
 	KEY_Init();
 	LED_Init();
-	select = SCREEN_function_list();
-	if(select == 0) LED1(ON);
-	else if(select== 1) LED2(ON);
-	else if(select== 2) LED3(ON);
-	else if(select== 3) LED4(ON);	
+	is_return = SCREEN_function_list();
+	if(focus == 0) LED1(ON);
+	else if(focus== 1) LED2(ON);
+	else if(focus== 2) LED3(ON);
+	else if(focus== 3) LED4(ON);	
 	else
 	{
 		LED1(OFF);
@@ -132,7 +134,7 @@ void INTERRUPT_test(void)
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2); //设置NVIC中断分组2:2位抢占优先级，2位响应优先级
 	ADC1_Init();
 	LED_Init();
-	TIM3_Int_Init(4999,7199);//10Khz的计数频率，计数到5000为500ms 
+	TIM3_Init(4999,7199);//10Khz的计数频率，计数到5000为500ms 
 	while(1)
 	{
 		if(temp < 25) LED1(ON);
@@ -142,17 +144,19 @@ void INTERRUPT_test(void)
 }
 
 //目前最完整的测试函数
+extern uint8_t focus;
 void UI_test(void)
 {
 	uint16_t i =1;
-	uint8_t select;
+	bool is_return;
 	uint8_t key = 0;
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2); 
 	KEY_Init();
 	LED_Init();
 	ADC1_Init();
 	LCD_Init();
-	TIM3_Int_Init(4999,7199);
+	TIM3_Init(4999,7199);
+	//TIM5_Init();
 main_screen:
 	SCREEN_frame_draw();
 	SCREEN_static_character_draw();
@@ -163,8 +167,23 @@ main_screen:
 		key = KEY_Scan(0);
 		if(key)
 		{
-			select = SCREEN_function_list();
-			if(select == 3) goto main_screen;
+			is_return = SCREEN_function_list();
+			if(focus == 0) 
+			{
+				is_return &= SCREEN_parameter_adjust();
+				goto main_screen;
+			}
+			else if(focus == 1) 
+			{
+				is_return &= SCREEN_introduction();
+				goto main_screen;
+			}
+			else if(focus == 2) 
+			{
+				is_return &= SCREEN_about();
+				goto main_screen;
+			}
+			else if(focus == 3) goto main_screen;
 		}
 		i++;
 		if(i>=200) i = 1;
@@ -172,3 +191,26 @@ main_screen:
 		Delay_Ms(200);
 	}	
 }
+
+
+//访存测试
+//失败
+//extern PID_CONTROLLER pid_controller;
+//void ADDRESS_ACCESS_test(void)
+//{
+//	LCD_Init();
+//	LCD_SetStart(30, 20);
+//	LCD_printf("Kp:%.2f",*(float*)(&pid_controller)); 
+//	LCD_SetStart(30, 50);
+//	LCD_printf("Kp_s:%.2f",*(float*)((&pid_controller) + 4)); 
+//	LCD_SetStart(30, 80);
+//	LCD_printf("Ki:%.2f",*(float*)(&pid_controller+0x04)); 
+//	LCD_SetStart(30, 110);
+//	LCD_printf("Ki_s:%.2f",pid_controller.Kp_strength); 
+//	LCD_SetStart(30, 140);
+//	LCD_printf("Kd:%.2f",*(float*)(&pid_controller+16)); 
+//	LCD_SetStart(30, 170);
+//	LCD_printf("Kd_s:%.2f",*(float*)(&pid_controller+20));
+//	LCD_SetStart(30, 200);
+//	LCD_printf("offset:%d", offsetof(PID_CONTROLLER,Ki));
+//}
